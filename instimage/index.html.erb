@@ -42,7 +42,6 @@
     },
     resize: function(img){
       img = $(img).store('meta', {width: img.width, height: img.height})
-      console.log("resizeing", img)
       if(img.width > img.height) {
         var width = 200
         var height = (200 / img.width) * img.height
@@ -55,14 +54,14 @@
     inform: function() {
       $$('#images img.virgin').each(function(i){
         i.removeClass('virgin')
-        Instimage.img2JSON(i)
+        this.img2JSON(i)
         i.addEvent('click', function(){
           Instimage.cancel()
           $('src').set('value', this.src)
           Instimage.explode(this)
           new Fx.Scroll(window).toElement('form')
         })
-      })
+      }, Instimage)
       if(this.pending.length == 0) {
         $$('#loading').destroy()
         var imgs = $$('#images img')
@@ -95,28 +94,24 @@
       })
     },
     explode: function(img) {
-      var pos = img.getPosition('images')
-      $$('#images img').each(function(i){
-        if(i != img)
-          i.fade()
-      })
-      var size = img.retrieve('meta')
-      if(img.width > 200 || img.height > 200) {
-        img.removeClass('exploded')
+      if(img.hasClass('exploded')) {
         $('submit_button').set('value', 'Find an image')
         new Fx.Tween(img, {
           property: 'opacity', 
           onComplete: function(){
-            Instimage.resize(img).setStyles({position:'static'}).fade('show')
+            Instimage.resize(img).removeClass('exploded').setStyle('position','static').fade('show')
           }
         }).start(0)
       } else {
+        var pos = img.getPosition('images')
+        var size = img.retrieve('meta')
         img.addClass('exploded')
         $('submit_button').set('value', 'Add an image')
         img.set('morph', {duration: 'long', transition: 'bounce:out'});
-        img.setStyles.delay(500, img, {position:'absolute', top:pos.y, left:pos.x})
-        img.morph.delay(500, img, { top:40, left:0, width:size.width, height:size.height})
+        img.setStyles.delay(500, img, {top:pos.y, left:pos.x})
+        img.morph.delay(500, img, { top:40, left:0, position:'absolute', width:size.width, height:size.height})
       }
+      $$('#images img:not(.exploded)').fade()
     },
     meta: function(meta) {
       $$('#images img').removeClass('cur')
@@ -144,7 +139,7 @@
     $('form').submit()
   })
   $('form').addEvent('submit', function(e){
-    if($$('.exploded').length == 0 && ($('src').value.length > 0 || $('search').value.length > 0) && $('image').value == "") {
+    if($$('.exploded').length == 0) {
       e.stop()
       $('stats').empty()
       if(Instimage.pending.length > 0 || $('loading'))
@@ -161,7 +156,7 @@
       //It's an image url
       if(src.test(/\.(jpg|jpeg|gif|png)$/)) {
         Instimage.preload(src)
-      } else {
+      } else if(src.length > 0) {
         new Request.JSON({
           onSuccess: function(json) {
             Instimage.pending = json
