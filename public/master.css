@@ -1,0 +1,60 @@
+body {
+  font:13px/1.22 "Bell Gothic Std",arial,clean,sans-serif;
+  *font-size:small;
+  *font:x-small;
+  color:#5f5f5f;
+  background:#efefef;
+  height:100%;
+}
+
+label {
+  margin-top:8px;
+  display:block;
+}
+
+#body {
+  margin:15px;
+}
+
+#loading {
+  display:block;
+}
+
+#form {
+  float:left;
+  margin:0 10px 10px 0;
+  height:1000px;
+  width:350px;
+}
+#form .wrapper {
+  padding:0 15px 15px;
+  border:3px #fefefe solid;
+}
+
+#images {
+  position:absolute;
+  left:380px;
+}
+
+#images img {
+  margin:5px 5px 0 5px;
+}
+
+#images img:hover, #images img.cur {
+  border:2px #777 solid;
+  margin:3px 3px -2px 3px;
+}
+
+dl dd {
+  margin-left:5px;
+  color:#aaa;
+}
+
+dl dl {
+  margin-left:5px;
+  font-size:90%;
+}
+
+.warn {
+  color:red;
+}

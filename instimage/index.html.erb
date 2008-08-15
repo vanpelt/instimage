@@ -1,0 +1,184 @@
+<form action="/instimage/create" method="post" id="form" enctype="multipart/form-data">
+  <div class="wrapper">
+    <h2>Instimage</h2>
+
+    <label>Add pics from your computer</label>
+    <input type="file" name="image" id="image"/>
+    <label>Add pics from a url</label>
+    <input type="text" name="src" id="src" style="width:225px"/>
+    <label>or search for an image</label>
+    <input type="text" name="search" id="search" />
+    <br/><br/>
+    <input type="submit" id="submit_button" value="Add an image"/>
+    <div id="stats"></div>
+  </div>
+</form>
+<div id="images">
+</div>
+<script type="text/javascript" charset="utf-8">
+  var Instimage = {
+    pending: [],
+    canceled: false,
+    search: "",
+    loading: new Element('img', {src:'/loading.gif', id:'loading'}),
+    goodImg: function() {
+      if(this.width > 200 && this.height > 150 && !Instimage.canceled) {
+        Instimage.resize(this).addClass('virgin').inject('images')
+      }
+      Instimage.pending.pop()
+      Instimage.inform()
+    },
+    cancel: function() {
+      this.pending = []
+      this.canceled = true
+      this.inform()
+    },
+    preload: function(img){
+      var image = new Image()
+      image.onload = this.goodImg
+      image.onerror = this.goodImg
+      this.cancel.delay(10000, this)
+      image.src = img
+    },
+    resize: function(img){
+      img = $(img).store('meta', {width: img.width, height: img.height})
+      console.log("resizeing", img)
+      if(img.width > img.height) {
+        var width = 200
+        var height = (200 / img.width) * img.height
+      } else {
+        var height = 200
+        var width = (200 / img.height) * img.width
+      }
+      return img.setStyles({width: width, height: height})
+    },
+    inform: function() {
+      $$('#images img.virgin').each(function(i){
+        i.removeClass('virgin')
+        Instimage.img2JSON(i)
+        i.addEvent('click', function(){
+          Instimage.cancel()
+          $('src').set('value', this.src)
+          Instimage.explode(this)
+          new Fx.Scroll(window).toElement('form')
+        })
+      })
+      if(this.pending.length == 0) {
+        $$('#loading').destroy()
+        var imgs = $$('#images img')
+        if(imgs.length > 0) {
+          if(imgs.length == 1) {
+            $('src').set('value', imgs[0].src)
+            this.explode(imgs[0])
+            $$('#images h2').set('html', 'This is the only one we found.')
+          } else {
+            $$('#images h2').set('html', 'Choose an image.')
+          }
+        } else
+          $$('#images h2').set('html', 'We could not find any images large enough from the url provided.')
+      }
+    },
+    warning: function(text) {
+      var warn = new Element('span', {'class':'warn', html:text}).inject($$('#form .wrapper')[0], 'top')
+      warn.fade.delay(3800, warn)
+      warn.dispose.delay(4800, warn)
+      new Fx.Scroll(window).toElement(warn)
+    },
+    img2JSON: function(img){
+      img.addEvent('mouseenter', function(){
+        var meta = this.retrieve('meta')
+        if(!(meta && meta.exif)) {
+          new Element('script', {type:'text/javascript', src:'http://img2json.appspot.com/go/?callback=Instimage.meta&url='+encodeURIComponent(this.src)}).inject('body')
+          $('stats').grab(Instimage.loading, 'top')
+        } else
+          Instimage.meta(meta)
+      })
+    },
+    explode: function(img) {
+      var pos = img.getPosition('images')
+      $$('#images img').each(function(i){
+        if(i != img)
+          i.fade()
+      })
+      var size = img.retrieve('meta')
+      if(img.width > 200 || img.height > 200) {
+        img.removeClass('exploded')
+        $('submit_button').set('value', 'Find an image')
+        new Fx.Tween(img, {
+          property: 'opacity', 
+          onComplete: function(){
+            Instimage.resize(img).setStyles({position:'static'}).fade('show')
+          }
+        }).start(0)
+      } else {
+        img.addClass('exploded')
+        $('submit_button').set('value', 'Add an image')
+        img.set('morph', {duration: 'long', transition: 'bounce:out'});
+        img.setStyles.delay(500, img, {position:'absolute', top:pos.y, left:pos.x})
+        img.morph.delay(500, img, { top:40, left:0, width:size.width, height:size.height})
+      }
+    },
+    meta: function(meta) {
+      $$('#images img').removeClass('cur')
+      $$('img[src='+meta.url+']').addClass('cur').store('meta', meta)   
+      this.dl(meta).replaces('stats')
+    },
+    dl: function(object) {
+      var stuff = []
+      $H(object).each(function(v,k){
+        stuff.push([new Element('dt', {html:k}), ($type(v) == "object" ? this.dl(v) : new Element('dd', {html:v}))])
+      }, Instimage)
+      return new Element('dl', {id:'stats'}).adopt(stuff)
+    }
+  }
+  $$('#search, #src').addEvent('focus', function(){
+    var exploded = $$('.exploded')[0]
+    if(exploded) {
+      Instimage.explode(exploded)
+    }
+    $('submit_button').set('value', 'Find an image')
+  })
+  $('image').addEvent('change', function(){
+    Instimage.loading.inject('image', 'before')
+    $('submit_button').set({'value': 'Uploading image...', 'disabled':'disabled'})
+    $('form').submit()
+  })
+  $('form').addEvent('submit', function(e){
+    if($$('.exploded').length == 0 && ($('src').value.length > 0 || $('search').value.length > 0) && $('image').value == "") {
+      e.stop()
+      $('stats').empty()
+      if(Instimage.pending.length > 0 || $('loading'))
+        return Instimage.warning("We are still looking for images... <a href='javascript:cancel()'>cancel</a>")
+      Instimage.canceled = false
+      $('images').empty()
+      $('images').grab(new Element('h2', {'html':'Checking for images...'}))
+      var src = $('src').value.test(/^http/) ? $('src').value : "http://"+$('src').value
+      //Search google for images
+      if(Instimage.search != $('search').value) {
+        Instimage.search = $('search').value
+        src = 'http://images.google.com/images?q='+encodeURIComponent(Instimage.search)
+      }
+      //It's an image url
+      if(src.test(/\.(jpg|jpeg|gif|png)$/)) {
+        Instimage.preload(src)
+      } else {
+        new Request.JSON({
+          onSuccess: function(json) {
+            Instimage.pending = json
+            if(json.length == 0)
+              Instimage.inform()
+            json.each(Instimage.preload, Instimage)
+          },
+          onFailure: function() {
+            Intimage.warning('There was a problem trying to load that url.')
+            $('loading').dispose()
+          },
+          data: {
+            src: src
+          }
+        }).get('/instimage/scrape')
+      }
+    }
+    Instimage.loading.inject('src', 'before')
+  })
+</script>
